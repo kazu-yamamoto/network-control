@@ -6,6 +6,7 @@ license-file:    LICENSE
 maintainer:      kazu@iij.ad.jp
 author:          Kazu Yamamoto
 synopsis:        Network control
+description:     Common parts to control network protocols
 category:        Network
 build-type:      Simple
 extra-doc-files: Changelog.md
