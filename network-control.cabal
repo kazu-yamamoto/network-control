@@ -12,13 +12,14 @@ build-type:      Simple
 extra-doc-files: Changelog.md
 
 library
-    exposed-modules:  Network.Control
+    exposed-modules:    Network.Control
     other-modules:
         Network.Control.LRUCache
         Network.Control.Rate
 
-    default-language: Haskell2010
-    ghc-options:      -Wall
+    default-language:   Haskell2010
+    default-extensions: Strict StrictData
+    ghc-options:        -Wall
     build-depends:
         base >=4.15 && <5,
         psqueues,
