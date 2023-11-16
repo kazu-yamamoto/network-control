@@ -14,6 +14,7 @@ extra-doc-files: Changelog.md
 library
     exposed-modules:    Network.Control
     other-modules:
+        Network.Control.Flow
         Network.Control.LRUCache
         Network.Control.Rate
 
