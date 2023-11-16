@@ -20,6 +20,7 @@ data TxFlow = TxFlow
     { txfSent :: Int
     , txfLimit :: Int
     }
+    deriving (Show)
 
 newTxFlow :: Int -> TxFlow
 newTxFlow win = TxFlow 0 win
@@ -33,6 +34,7 @@ data RxFlow = RxFlow
     , rxfReceived :: Int
     , rxfLimit :: Int
     }
+    deriving (Show)
 
 newRxFlow :: Int -> RxFlow
 newRxFlow win = RxFlow win 0 0 win
