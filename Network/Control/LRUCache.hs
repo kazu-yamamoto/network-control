@@ -25,7 +25,10 @@ data LRUCache k v = LRUCache
     }
 
 -- | Empty 'LRUCache'.
-empty :: Int -> LRUCache k v
+empty
+    :: Int
+    -- ^ The size of 'LRUCache'.
+    -> LRUCache k v
 empty lim = LRUCache lim 0 0 PSQ.empty
 
 -- | Inserting.

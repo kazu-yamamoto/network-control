@@ -1,3 +1,4 @@
+-- | Common parts to control network protocols.
 module Network.Control (
     module Network.Control.Flow,
     module Network.Control.LRUCache,
