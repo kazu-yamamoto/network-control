@@ -64,7 +64,7 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
 
 checkRxLimit :: Int -> RxFlow -> (RxFlow, Bool)
 checkRxLimit received flow@RxFlow{..}
-    | received' < rxfLimit =
+    | received' <= rxfLimit =
         let flow' = flow{rxfReceived = received'}
          in (flow', True)
     | otherwise = (flow, False)
