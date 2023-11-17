@@ -1,5 +1,9 @@
 # Revision history for network-control
 
-## 0.0.0 -- YYYY-mm-dd
+## 0.0.1
 
-* First version. Released on an unsuspecting world.
+* Supporting GHC 8.10.
+
+## 0.0.0
+
+* First version.
