@@ -83,7 +83,7 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
          in (flow', Nothing)
   where
     available = rxfLimit - rxfReceived
-    threshold = rxfWindow .>>. 1
+    threshold = rxfWindow `unsafeShiftR` 1
     consumed' = rxfConsumed + consumed
 
 -- | Checking if received data is acceptable against the
