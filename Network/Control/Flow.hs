@@ -1,6 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.Control.Flow (
+    -- * Constants for flow control.
+    defaultMaxStreams,
+    defaultMaxStreamData,
+    defaultMaxData,
+
     -- * Flow control for sending
     TxFlow (..),
     newTxFlow,
@@ -16,6 +21,18 @@ module Network.Control.Flow (
 ) where
 
 import Data.Bits
+
+-- | Default max streams. (64)
+defaultMaxStreams :: Int
+defaultMaxStreams = 64
+
+-- | Default max data of a stream. (256K bytes)
+defaultMaxStreamData :: Int
+defaultMaxStreamData = 262144
+
+-- | Default max data of a connection. (1M bytes)
+defaultMaxData :: Int
+defaultMaxData = 1048576
 
 -- | Window size.
 type WindowSize = Int
