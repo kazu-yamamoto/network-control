@@ -8,11 +8,12 @@
 module Network.Control.FlowSpec where
 
 import Data.List
+import Data.Text.Lazy (unpack)
 import Network.Control
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
-import Text.Show.Pretty
+import Text.Pretty.Simple
 
 -- types
 
@@ -131,4 +132,4 @@ assertStep oldFlow ((ix, step, newFlow) : steps) =
 spec :: Spec
 spec = do
   focus . prop "state transition graph checks out" $
-    \trace -> counterexample (ppShow trace) (assertTrace trace)
+    \trace -> counterexample (unpack $ pShowNoColor trace) (assertTrace trace)
