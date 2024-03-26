@@ -16,8 +16,6 @@ import Text.Show.Pretty
 
 -- types
 
-deriving instance Eq RxFlow
-
 data Op = Consume | Receive
   deriving (Eq, Show, Bounded, Enum)
 
