@@ -42,7 +42,7 @@ data TxFlow = TxFlow
     { txfSent :: Int
     , txfLimit :: Int
     }
-    deriving (Show)
+    deriving (Eq, Show)
 
 -- | Creating TX flow with an initial window size.
 newTxFlow :: WindowSize -> TxFlow
@@ -59,7 +59,7 @@ data RxFlow = RxFlow
     , rxfReceived :: Int
     , rxfLimit :: Int
     }
-    deriving (Show)
+    deriving (Eq, Show)
 
 -- | Creating RX flow with an initial window size.
 newRxFlow :: WindowSize -> RxFlow
