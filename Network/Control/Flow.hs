@@ -52,12 +52,28 @@ newTxFlow win = TxFlow 0 win
 txWindowSize :: TxFlow -> WindowSize
 txWindowSize TxFlow{..} = txfLimit - txfSent
 
--- | Flow for receiving
+-- | Flow for receiving.
+--
+--  The peer can send data whose size is 'rxfLimit' - 'rxfReceived'.
+--
+-- @
+--                 rxfWindow
+--        |------------------------| slide to the right when consumed
+-- -------------------------------------->
+--        ^            ^           ^
+--   rxfConsumed   rxfReceived  rxfLimit
+--
+--                     |-----------| The size which the peer can send
+-- @
 data RxFlow = RxFlow
     { rxfWindow :: WindowSize
+    -- ^ Window size or received buffer size. This is fixed after initialized by 'newRxFlow'.
     , rxfConsumed :: Int
+    -- ^ The total size which the application is consumed.
     , rxfReceived :: Int
+    -- ^ The total received size.
     , rxfLimit :: Int
+    -- ^ The value of 'rxfConsumed' + 'rxfWindow'
     }
     deriving (Eq, Show)
 
@@ -72,9 +88,9 @@ data FlowControlType
     | -- | QUIC style
       FCTMaxData
 
--- | When an application consumed received data,
---   this function should be called to update 'rxfConsumed'.
---   If the window size is less than the half of the initial window.
+-- | When an application consumed received data, this function should
+--   be called to update 'rxfConsumed'.  If the available buffer size
+--   is less than the half of the total buffer size (initial window).
 --   the representation of window size update is returned.
 maybeOpenRxWindow
     :: Int
