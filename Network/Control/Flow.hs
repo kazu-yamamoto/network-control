@@ -45,13 +45,13 @@ type WindowSize = Int
 
 -- | Flow for sending
 --
---
 -- @
 -- -------------------------------------->
 --        ^           ^
 --     txfSent    txfLimit
 --
 --        |-----------| The size which this node can send
+--        txWindowSize
 -- @
 data TxFlow = TxFlow
     { txfSent :: Int
