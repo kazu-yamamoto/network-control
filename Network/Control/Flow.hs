@@ -118,15 +118,15 @@ maybeOpenRxWindow
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
     | available < threshold =
-        let limit = consumed' + rxfWindow
+        let rxfLimit' = consumed' + rxfWindow
             flow' =
                 flow
                     { rxfConsumed = consumed'
-                    , rxfLimit = limit
+                    , rxfLimit = rxfLimit'
                     }
             update = case fct of
-                FCTWindowUpdate -> limit - rxfLimit
-                FCTMaxData -> limit
+                FCTWindowUpdate -> rxfLimit' - rxfLimit
+                FCTMaxData -> rxfLimit
          in (flow', Just update)
     | otherwise =
         let flow' = flow{rxfConsumed = consumed'}
