@@ -75,7 +75,7 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 --
 -- @
 --                 rxfWindow
---        |------------------------| slide to the right when consumed
+--        |------------------------|
 -- -------------------------------------->
 --        ^            ^           ^
 --   rxfConsumed   rxfReceived  rxfLimit
@@ -106,9 +106,38 @@ data FlowControlType
       FCTMaxData
 
 -- | When an application consumed received data, this function should
---   be called to update 'rxfConsumed'.  If the available buffer size
+--   be called to update 'rxfConsumed'. If the available buffer size
 --   is less than the half of the total buffer size (initial window).
 --   the representation of window size update is returned.
+--
+-- @
+-- Example:
+--
+--                 rxfWindow
+--        |------------------------|
+-- -------------------------------------->
+--        ^            ^           ^
+--   rxfConsumed   rxfReceived  rxfLimit
+--
+--
+-- In the case where the window update should be informed to the peer,
+-- 'rxfConsumed' and 'rxfLimit' move to the right.
+--
+--                   rxfWindow
+--          |------------------------|
+-- -------------------------------------->
+--          ^          ^             ^
+--     rxfConsumed rxfReceived    rxfLimit
+--
+-- Otherwise, only 'rxfConsumed' moves to the right.
+--
+--                 rxfWindow
+--        |------------------------|
+-- -------------------------------------->
+--          ^          ^           ^
+--     rxfConsumed rxfReceived  rxfLimit
+--
+-- @
 maybeOpenRxWindow
     :: Int
     -- ^ The consumed size.
