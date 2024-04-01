@@ -61,7 +61,7 @@ data TxFlow = TxFlow
     }
     deriving (Eq, Show)
 
--- | Creating TX flow with an initial window size.
+-- | Creating TX flow with a receive buffer size.
 newTxFlow :: WindowSize -> TxFlow
 newTxFlow win = TxFlow 0 win
 
@@ -71,26 +71,25 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 
 -- | Flow for receiving.
 --
---  The peer can send data whose size is 'rxfLimit' - 'rxfReceived'.
---
 -- @
---                 rxfWindow
+--                 rxfBufSize
 --        |------------------------|
 -- -------------------------------------->
 --        ^            ^           ^
 --   rxfConsumed   rxfReceived  rxfLimit
 --
 --                     |-----------| The size which the peer can send
+--                        Window
 -- @
 data RxFlow = RxFlow
-    { rxfWindow :: WindowSize
-    -- ^ Window size or received buffer size. This is fixed after initialized by 'newRxFlow'.
+    { rxfBufSize :: Int
+    -- ^ Receive buffer size.
     , rxfConsumed :: Int
     -- ^ The total size which the application is consumed.
     , rxfReceived :: Int
-    -- ^ The total received size.
+    -- ^ The total already-received size.
     , rxfLimit :: Int
-    -- ^ The value of 'rxfConsumed' + 'rxfWindow'
+    -- ^ The total size which can be recived.
     }
     deriving (Eq, Show)
 
@@ -107,35 +106,38 @@ data FlowControlType
 
 -- | When an application consumed received data, this function should
 --   be called to update 'rxfConsumed'. If the available buffer size
---   is less than the half of the total buffer size (initial window).
+--   is less than the half of the total buffer size.
 --   the representation of window size update is returned.
 --
 -- @
 -- Example:
 --
---                 rxfWindow
+--                 rxfBufSize
 --        |------------------------|
 -- -------------------------------------->
 --        ^            ^           ^
 --   rxfConsumed   rxfReceived  rxfLimit
---
+--                     |01234567890|
 --
 -- In the case where the window update should be informed to the peer,
--- 'rxfConsumed' and 'rxfLimit' move to the right.
+-- 'rxfConsumed' and 'rxfLimit' move to the right. The difference
+-- of old and new 'rxfLimit' is window update.
 --
---                   rxfWindow
+--                   rxfBufSize
 --          |------------------------|
 -- -------------------------------------->
 --          ^          ^             ^
 --     rxfConsumed rxfReceived    rxfLimit
+--                     |0123456789012| : window glows
 --
 -- Otherwise, only 'rxfConsumed' moves to the right.
 --
---                 rxfWindow
+--                 rxfBufSize
 --        |------------------------|
 -- -------------------------------------->
 --          ^          ^           ^
 --     rxfConsumed rxfReceived  rxfLimit
+--                     |01234567890| : window stays
 --
 -- @
 maybeOpenRxWindow
@@ -147,7 +149,7 @@ maybeOpenRxWindow
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
     | available < threshold =
-        let rxfLimit' = consumed' + rxfWindow
+        let rxfLimit' = consumed' + rxfBufSize
             flow' =
                 flow
                     { rxfConsumed = consumed'
@@ -162,7 +164,7 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
          in (flow', Nothing)
   where
     available = rxfLimit - rxfReceived
-    threshold = rxfWindow `unsafeShiftR` 1
+    threshold = rxfBufSize `unsafeShiftR` 1
     consumed' = rxfConsumed + consumed
 
 -- | Checking if received data is acceptable against the
