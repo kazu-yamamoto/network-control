@@ -1,18 +1,24 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.Control.Flow (
-    -- * Constants for flow control.
+    -- * Flow control
+
+    -- | This is based on the total approach of QUIC rather than
+    --   the difference approach of HTTP\/2 because QUIC'one is
+    --   considered safer.
+
+    -- ** Constants for flow control.
     defaultMaxStreams,
     defaultMaxStreamData,
     defaultMaxData,
 
-    -- * Flow control for sending
+    -- ** Flow control for sending
     TxFlow (..),
     newTxFlow,
     txWindowSize,
     WindowSize,
 
-    -- * Flow control for receiving
+    -- ** Flow control for receiving
     RxFlow (..),
     newRxFlow,
     FlowControlType (..),
