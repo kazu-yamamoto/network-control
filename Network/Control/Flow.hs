@@ -21,6 +21,7 @@ module Network.Control.Flow (
     -- ** Flow control for receiving
     RxFlow (..),
     newRxFlow,
+    rxWindowSize,
     FlowControlType (..),
     maybeOpenRxWindow,
     checkRxLimit,
@@ -79,7 +80,7 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 --   rxfConsumed   rxfReceived  rxfLimit
 --
 --                     |-----------| The size which the peer can send
---                        Window
+--                      rxWindowSize
 -- @
 data RxFlow = RxFlow
     { rxfBufSize :: Int
@@ -96,6 +97,10 @@ data RxFlow = RxFlow
 -- | Creating RX flow with an initial window size.
 newRxFlow :: WindowSize -> RxFlow
 newRxFlow win = RxFlow win 0 0 win
+
+-- | 'rxfLimit' - 'rxfReceived'.
+rxWindowSize :: RxFlow -> WindowSize
+rxWindowSize RxFlow{..} = rxfLimit - rxfReceived
 
 -- | The representation of window size update.
 data FlowControlType
