@@ -5,7 +5,7 @@ module Network.Control.Flow (
 
     -- | This is based on the total approach of QUIC rather than
     --   the difference approach of HTTP\/2 because QUIC'one is
-    --   considered safer.
+    --   considered safer. Please refer to [Using HTTP\/3 Stream Limits in HTTP\/2](https://datatracker.ietf.org/doc/draft-thomson-httpbis-h2-stream-limits/) to understand that QUIC's approaches are better though its topic is about stream concurrency.
 
     -- ** Constants for flow control.
     defaultMaxStreams,
