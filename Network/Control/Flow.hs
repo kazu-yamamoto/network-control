@@ -1,18 +1,24 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.Control.Flow (
-    -- * Constants for flow control.
+    -- * Flow control
+
+    -- | This is based on the total approach of QUIC rather than
+    --   the difference approach of HTTP\/2 because QUIC'one is
+    --   considered safer. Please refer to [Using HTTP\/3 Stream Limits in HTTP\/2](https://datatracker.ietf.org/doc/draft-thomson-httpbis-h2-stream-limits/) to understand that QUIC's approaches are better though its topic is about stream concurrency.
+
+    -- ** Constants for flow control.
     defaultMaxStreams,
     defaultMaxStreamData,
     defaultMaxData,
 
-    -- * Flow control for sending
+    -- ** Flow control for sending
     TxFlow (..),
     newTxFlow,
     txWindowSize,
     WindowSize,
 
-    -- * Flow control for receiving
+    -- ** Flow control for receiving
     RxFlow (..),
     newRxFlow,
     FlowControlType (..),
@@ -39,13 +45,13 @@ type WindowSize = Int
 
 -- | Flow for sending
 --
---
 -- @
 -- -------------------------------------->
 --        ^           ^
 --     txfSent    txfLimit
 --
 --        |-----------| The size which this node can send
+--        txWindowSize
 -- @
 data TxFlow = TxFlow
     { txfSent :: Int
@@ -55,7 +61,7 @@ data TxFlow = TxFlow
     }
     deriving (Eq, Show)
 
--- | Creating TX flow with an initial window size.
+-- | Creating TX flow with a receive buffer size.
 newTxFlow :: WindowSize -> TxFlow
 newTxFlow win = TxFlow 0 win
 
@@ -65,26 +71,25 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 
 -- | Flow for receiving.
 --
---  The peer can send data whose size is 'rxfLimit' - 'rxfReceived'.
---
 -- @
---                 rxfWindow
---        |------------------------| slide to the right when consumed
+--                 rxfBufSize
+--        |------------------------|
 -- -------------------------------------->
 --        ^            ^           ^
 --   rxfConsumed   rxfReceived  rxfLimit
 --
 --                     |-----------| The size which the peer can send
+--                        Window
 -- @
 data RxFlow = RxFlow
-    { rxfWindow :: WindowSize
-    -- ^ Window size or received buffer size. This is fixed after initialized by 'newRxFlow'.
+    { rxfBufSize :: Int
+    -- ^ Receive buffer size.
     , rxfConsumed :: Int
     -- ^ The total size which the application is consumed.
     , rxfReceived :: Int
-    -- ^ The total received size.
+    -- ^ The total already-received size.
     , rxfLimit :: Int
-    -- ^ The value of 'rxfConsumed' + 'rxfWindow'
+    -- ^ The total size which can be recived.
     }
     deriving (Eq, Show)
 
@@ -100,9 +105,41 @@ data FlowControlType
       FCTMaxData
 
 -- | When an application consumed received data, this function should
---   be called to update 'rxfConsumed'.  If the available buffer size
---   is less than the half of the total buffer size (initial window).
+--   be called to update 'rxfConsumed'. If the available buffer size
+--   is less than the half of the total buffer size.
 --   the representation of window size update is returned.
+--
+-- @
+-- Example:
+--
+--                 rxfBufSize
+--        |------------------------|
+-- -------------------------------------->
+--        ^            ^           ^
+--   rxfConsumed   rxfReceived  rxfLimit
+--                     |01234567890|
+--
+-- In the case where the window update should be informed to the peer,
+-- 'rxfConsumed' and 'rxfLimit' move to the right. The difference
+-- of old and new 'rxfLimit' is window update.
+--
+--                   rxfBufSize
+--          |------------------------|
+-- -------------------------------------->
+--          ^          ^             ^
+--     rxfConsumed rxfReceived    rxfLimit
+--                     |0123456789012| : window glows
+--
+-- Otherwise, only 'rxfConsumed' moves to the right.
+--
+--                 rxfBufSize
+--        |------------------------|
+-- -------------------------------------->
+--          ^          ^           ^
+--     rxfConsumed rxfReceived  rxfLimit
+--                     |01234567890| : window stays
+--
+-- @
 maybeOpenRxWindow
     :: Int
     -- ^ The consumed size.
@@ -112,22 +149,22 @@ maybeOpenRxWindow
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
     | available < threshold =
-        let limit = consumed' + rxfWindow
+        let rxfLimit' = consumed' + rxfBufSize
             flow' =
                 flow
                     { rxfConsumed = consumed'
-                    , rxfLimit = limit
+                    , rxfLimit = rxfLimit'
                     }
             update = case fct of
-                FCTWindowUpdate -> limit - rxfLimit
-                FCTMaxData -> limit
+                FCTWindowUpdate -> rxfLimit' - rxfLimit
+                FCTMaxData -> rxfLimit
          in (flow', Just update)
     | otherwise =
         let flow' = flow{rxfConsumed = consumed'}
          in (flow', Nothing)
   where
     available = rxfLimit - rxfReceived
-    threshold = rxfWindow `unsafeShiftR` 1
+    threshold = rxfBufSize `unsafeShiftR` 1
     consumed' = rxfConsumed + consumed
 
 -- | Checking if received data is acceptable against the

@@ -1,4 +1,5 @@
 -- | Common parts to control network protocols.
+--   This library assumes that 'Int' is 64bit.
 module Network.Control (
     module Network.Control.Flow,
     module Network.Control.LRUCache,
