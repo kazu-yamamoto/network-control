@@ -157,7 +157,7 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
                     }
             update = case fct of
                 FCTWindowUpdate -> rxfLimit' - rxfLimit
-                FCTMaxData -> rxfLimit
+                FCTMaxData -> rxfLimit'
          in (flow', Just update)
     | otherwise =
         let flow' = flow{rxfConsumed = consumed'}
