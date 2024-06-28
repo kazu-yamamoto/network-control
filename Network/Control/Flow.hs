@@ -37,9 +37,18 @@ defaultMaxStreams = 64
 defaultMaxStreamData :: Int
 defaultMaxStreamData = 262144
 
--- | Default max data of a connection. (1M bytes)
+-- | Default max data of a connection.
+--
+-- By default, this is set to @defaultMaxStreams * defaultMaxStreamData@. This
+-- ensures that streams that are not currently handled cannot exhaust the
+-- connection window.
+--
+-- If you use a smaller connection window size, you __must__ ensure that if you
+-- are handling fewer concurrent streams than allowed by 'defaultMaxStreams',
+-- that the unhandled streams cannot exhaust the connection window, or risk the
+-- entire system deadlocking.
 defaultMaxData :: Int
-defaultMaxData = 1048576
+defaultMaxData = defaultMaxStreamData * defaultMaxStreams
 
 -- | Window size.
 type WindowSize = Int
