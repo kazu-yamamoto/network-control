@@ -1,5 +1,10 @@
 # Revision history for network-control
 
+## 0.1.2
+
+* introducing a minimum size for window update
+  [#5](https://github.com/kazu-yamamoto/network-control/pull/5)
+
 ## 0.1.1
 
 * Change defaultMaxData
