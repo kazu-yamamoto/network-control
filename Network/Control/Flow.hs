@@ -120,8 +120,9 @@ data FlowControlType
 
 -- | When an application consumed received data, this function should
 --   be called to update 'rxfConsumed'. If the available buffer size
---   is less than the half of the total buffer size.
---   the representation of window size update is returned.
+--   is less than the half of the total buffer size AND window size update
+--   is greater than 1/8 of the the total buffer size,
+--   the representation of the window size update is returned.
 --
 -- @
 -- Example:
@@ -162,15 +163,14 @@ maybeOpenRxWindow
     -> (RxFlow, Maybe Int)
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
-    | available < threshold =
-        let rxfLimit' = consumed' + rxfBufSize
-            flow' =
+    | available < threshold && winUpdate > minSize =
+        let flow' =
                 flow
                     { rxfConsumed = consumed'
                     , rxfLimit = rxfLimit'
                     }
             update = case fct of
-                FCTWindowUpdate -> rxfLimit' - rxfLimit
+                FCTWindowUpdate -> winUpdate
                 FCTMaxData -> rxfLimit'
          in (flow', Just update)
     | otherwise =
@@ -179,7 +179,10 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
   where
     available = rxfLimit - rxfReceived
     threshold = rxfBufSize `unsafeShiftR` 1
+    minSize = rxfBufSize `unsafeShiftR` 3
     consumed' = rxfConsumed + consumed
+    rxfLimit' = consumed' + rxfBufSize
+    winUpdate = rxfLimit' - rxfLimit
 
 -- | Checking if received data is acceptable against the
 --   current window.
