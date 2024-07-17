@@ -37,11 +37,14 @@ data Trace = Trace
 maxWindowSize :: Int
 maxWindowSize = 200 -- (more realistic: 2_000_000)
 
-minFrameSize :: Int
-minFrameSize = -20
-
 instance Arbitrary RxFlow where
-    arbitrary = newRxFlow <$> chooseInt (1, maxWindowSize)
+    -- Prefer to generate a simple window size
+    arbitrary =
+        newRxFlow
+            <$> oneof
+                [ elements [1, 10, 50, 100]
+                , chooseInt (1, maxWindowSize)
+                ]
 
 instance Arbitrary Op where
     arbitrary = elements [minBound ..]
@@ -54,23 +57,23 @@ instance Arbitrary Trace where
       where
         runManySteps :: Int -> Int -> RxFlow -> Gen [(Int, Step OpWithResult, RxFlow)]
         runManySteps 0 _ _ = pure []
-        runManySteps len ix oldFlow | len > 0 = do
+        runManySteps len ix oldFlow = do
             (newStep, newFlow) <- runStep oldFlow <$> genStep oldFlow
             ((ix, newStep, newFlow) :) <$> runManySteps (len - 1) (ix + 1) newFlow
 
-        -- Not sure frame size > window size or 0 or engative consumed or received bytes are
-        -- legal, but RxFlow works fine with them.  :)
         genStep :: RxFlow -> Gen (Step Op)
         genStep oldFlow = oneof [mkConsume, mkReceive]
           where
+            -- Negative frames are non-sensical; frames larger than the window
+            -- size are theoretically possible (but will trivially be rejected
+            -- as exceeding the window).
             mkReceive =
-                Step Receive <$> chooseInt (minFrameSize, rxfBufSize oldFlow * 2)
+                Step Receive <$> chooseInt (0, rxfBufSize oldFlow * 2)
 
+            -- We can only consume as much as we have received
+            -- (but it is in principle not a problem to consume 0 bytes)
             mkConsume =
-                let recv = rxfReceived oldFlow
-                 in if recv > 0
-                        then Step Consume <$> chooseInt (minFrameSize, rxfReceived oldFlow)
-                        else mkReceive
+                Step Consume <$> chooseInt (0, rxfReceived oldFlow - rxfConsumed oldFlow)
 
         runStep :: RxFlow -> Step Op -> (Step OpWithResult, RxFlow)
         runStep oldFlow = \case
@@ -81,14 +84,17 @@ instance Arbitrary Trace where
                 let (newFlow, isAcceptable) = checkRxLimit arg oldFlow
                  in (Step (ReceiveWithResult isAcceptable) arg, newFlow)
 
-    shrink trace@(Trace initialFlow steps) =
-        trunc trace <> (Trace initialFlow <$> init (inits steps))
+    shrink (Trace initialFlow steps) =
+        concat
+            [ -- Take a prefix (starting with the same initialFlow)
+              Trace initialFlow <$> init (inits steps)
+            , -- Take a suffix (starting with a later initialFlow)
+              map shiftInitialFlow $ tail (tails steps)
+            ]
       where
-        trunc :: Trace -> [Trace]
-        trunc (Trace _ stp) = case reverse stp of
-            [] -> []
-            [_] -> []
-            ((ix, lastStep, lastFlow) : (_, _, initFlow) : _) -> [Trace initFlow [(ix, lastStep, lastFlow)]]
+        shiftInitialFlow :: [(Int, Step OpWithResult, RxFlow)] -> Trace
+        shiftInitialFlow [] = Trace initialFlow []
+        shiftInitialFlow ((_, _, initialFlow') : rest) = Trace initialFlow' rest
 
 -- invariants
 
@@ -103,20 +109,42 @@ assertStep oldFlow ((ix, step, newFlow) : steps) =
     check :: Expectation
     check = case step of
         Step (ConsumeWithResult limitDelta) arg -> do
+            -- There is no point duplicating precisely the same logic here as in
+            -- 'maybeOpenRxWindow': that would result in circular reasoning.
+            -- Instead, we leave 'maybeOpenRxWindow' some implementation
+            -- freedom, and only verify that the window update makes sense:
+            --
+            -- (a) It can't be too large: the new window after the update should
+            --     never exceed the specified buffer size.
+            -- (b) It can't be too late: if we consume /all/ received data, and
+            --     do not allow the peer to send any further data, then the
+            --     system deadlocks.
+            -- (c) It shouldn't be too small: very small window updates are
+            --     wasteful.
+            --
+            -- Within these parameters 'maybeOpenRxWindow' can decide when to
+            -- send window updates and how large they should be. We also don't
+            -- set the bound on (c) too strict.
             newFlow
                 `shouldBe` RxFlow
-                    { rxfBufSize = rxfBufSize newFlow
+                    { rxfBufSize = rxfBufSize oldFlow
                     , rxfConsumed = rxfConsumed oldFlow + arg
                     , rxfReceived = rxfReceived oldFlow
-                    , rxfLimit =
-                        if rxfLimit oldFlow - rxfReceived oldFlow < rxfBufSize oldFlow `div` 2
-                            then rxfConsumed oldFlow + arg + rxfBufSize oldFlow
-                            else rxfLimit oldFlow
+                    , rxfLimit = case limitDelta of
+                        Nothing -> rxfLimit oldFlow
+                        Just upd -> rxfLimit oldFlow + upd
                     }
-            limitDelta
-                `shouldBe` case rxfLimit newFlow - rxfLimit oldFlow of
-                    0 -> Nothing
-                    n -> Just n
+            -- Condition (a)
+            newFlow `shouldSatisfy` \flow ->
+                rxfLimit flow - rxfConsumed flow <= rxfBufSize flow
+            -- Condition (b)
+            newFlow `shouldSatisfy` \flow ->
+                rxfLimit flow > rxfConsumed flow
+            -- Condition (c)
+            limitDelta `shouldSatisfy` \mUpd ->
+                case mUpd of
+                    Nothing -> True
+                    Just upd -> upd >= rxfBufSize newFlow `div` 8
         Step (ReceiveWithResult isAcceptable) arg -> do
             newFlow
                 `shouldBe` if isAcceptable
