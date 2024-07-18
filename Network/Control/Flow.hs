@@ -81,25 +81,55 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 
 -- | Flow for receiving.
 --
--- @
---                 rxfBufSize
---        |------------------------|
--- -------------------------------------->
---        ^            ^           ^
---   rxfConsumed   rxfReceived  rxfLimit
+-- The goal of 'RxFlow' is to ensure that our network peer does not send us data
+-- faster than we can consume it. We therefore impose a maximum number of
+-- unconsumed bytes that we are willing to receive from the peer, which we refer
+-- to as the buffer size:
 --
---                     |-----------| The size which the peer can send
---                      rxWindowSize
 -- @
+--                    rxfBufSize
+--           |---------------------------|
+-- -------------------------------------------->
+--           ^              ^
+--      rxfConsumed    rxvReceived
+-- @
+--
+-- The peer does not know of course how many bytes we have consumed of the data
+-- that they sent us, so they keep track of their own limit of how much data
+-- they are allowed to send. We keep track of this limit also:
+--
+-- @
+--                    rxfBufSize
+--           |---------------------------|
+-- -------------------------------------------->
+--           ^              ^       ^
+--      rxfConsumed    rxvReceived  |
+--                               rxfLimit
+-- @
+--
+-- Each time we receive data from the peer, we check that they do not exceed the
+-- limit ('checkRxLimit'). When we consume data, we periodically send the peer
+-- an update (known as a _window update_) of what their new limit is
+-- ('maybeOpenRxWindow'). To decrease overhead, we only this if the window
+-- update is at least half the window size.
 data RxFlow = RxFlow
     { rxfBufSize :: Int
-    -- ^ Receive buffer size.
+    -- ^ Maxinum number of unconsumed bytes the peer can send us
+    --
+    -- See discussion above for details.
     , rxfConsumed :: Int
-    -- ^ The total size which the application is consumed.
+    -- ^ How much of the data that the peer has sent us have we consumed?
+    --
+    -- This is an absolute number: the total about of bytes consumed over the
+    -- lifetime of the connection or stream (i.e., not relative to the window).
     , rxfReceived :: Int
-    -- ^ The total already-received size.
+    -- ^ How much data have we received from the peer?
+    --
+    -- Like 'rxfConsumed', this is an absolute number.
     , rxfLimit :: Int
-    -- ^ The total size which can be recived.
+    -- ^ Current limit on how many bytes the peer is allowed to send us.
+    --
+    -- Like 'rxfConsumed, this is an absolute number.
     }
     deriving (Eq, Show)
 
@@ -108,6 +138,9 @@ newRxFlow :: WindowSize -> RxFlow
 newRxFlow win = RxFlow win 0 0 win
 
 -- | 'rxfLimit' - 'rxfReceived'.
+--
+-- This is the number of bytes the peer is still allowed to send before they
+-- must wait for a window update; see 'RxFlow' for details.
 rxWindowSize :: RxFlow -> WindowSize
 rxWindowSize RxFlow{..} = rxfLimit - rxfReceived
 
@@ -118,43 +151,9 @@ data FlowControlType
     | -- | QUIC style
       FCTMaxData
 
--- | When an application consumed received data, this function should
---   be called to update 'rxfConsumed'. If the available buffer size
---   is less than the half of the total buffer size AND window size update
---   is greater than 1/8 of the the total buffer size,
---   the representation of the window size update is returned.
+-- | Record that we have consumed some received data
 --
--- @
--- Example:
---
---                 rxfBufSize
---        |------------------------|
--- -------------------------------------->
---        ^            ^           ^
---   rxfConsumed   rxfReceived  rxfLimit
---                     |01234567890|
---
--- In the case where the window update should be informed to the peer,
--- 'rxfConsumed' and 'rxfLimit' move to the right. The difference
--- of old and new 'rxfLimit' is window update.
---
---                   rxfBufSize
---          |------------------------|
--- -------------------------------------->
---          ^          ^             ^
---     rxfConsumed rxfReceived    rxfLimit
---                     |0123456789012| : window glows
---
--- Otherwise, only 'rxfConsumed' moves to the right.
---
---                 rxfBufSize
---        |------------------------|
--- -------------------------------------->
---          ^          ^           ^
---     rxfConsumed rxfReceived  rxfLimit
---                     |01234567890| : window stays
---
--- @
+-- May return a window update; see 'RxFlow' for details.
 maybeOpenRxWindow
     :: Int
     -- ^ The consumed size.
@@ -163,10 +162,10 @@ maybeOpenRxWindow
     -> (RxFlow, Maybe Int)
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
-    | available < threshold && winUpdate > minSize =
+    | winUpdate >= threshold =
         let flow' =
                 flow
-                    { rxfConsumed = consumed'
+                    { rxfConsumed = rxfConsumed'
                     , rxfLimit = rxfLimit'
                     }
             update = case fct of
@@ -174,14 +173,16 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
                 FCTMaxData -> rxfLimit'
          in (flow', Just update)
     | otherwise =
-        let flow' = flow{rxfConsumed = consumed'}
+        let flow' = flow{rxfConsumed = rxfConsumed'}
          in (flow', Nothing)
   where
-    available = rxfLimit - rxfReceived
+    rxfConsumed' = rxfConsumed + consumed
+
+    -- Minimum window update size
     threshold = rxfBufSize `unsafeShiftR` 1
-    minSize = rxfBufSize `unsafeShiftR` 3
-    consumed' = rxfConsumed + consumed
-    rxfLimit' = consumed' + rxfBufSize
+
+    -- The window update, /if/ we choose to send it
+    rxfLimit' = rxfConsumed' + rxfBufSize
     winUpdate = rxfLimit' - rxfLimit
 
 -- | Checking if received data is acceptable against the
