@@ -1,5 +1,10 @@
 # Revision history for network-control
 
+## 0.1.3
+
+* Simplify `maybeOpenRxWindow` and improve docs
+  [#7](https://github.com/kazu-yamamoto/network-control/pull/7)
+
 ## 0.1.2
 
 * introducing a minimum size for window update
