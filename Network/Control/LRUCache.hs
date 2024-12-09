@@ -14,7 +14,7 @@ import Prelude hiding (lookup)
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
 
-type Priority = Int
+type Priority = Integer
 
 -- | Sized cache based on least recently used.
 data LRUCache k v = LRUCache
