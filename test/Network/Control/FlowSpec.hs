@@ -89,7 +89,7 @@ instance Arbitrary Trace where
             [ -- Take a prefix (starting with the same initialFlow)
               Trace initialFlow <$> init (inits steps)
             , -- Take a suffix (starting with a later initialFlow)
-              map shiftInitialFlow $ tail (tails steps)
+              map shiftInitialFlow $ drop 1 (tails steps)
             ]
       where
         shiftInitialFlow :: [(Int, Step OpWithResult, RxFlow)] -> Trace
