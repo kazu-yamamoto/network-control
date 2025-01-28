@@ -1,5 +1,9 @@
 # Revision history for network-control
 
+## 0.1.4
+
+* Using Integer instead of Int in LRUCache.
+
 ## 0.1.3
 
 * Simplify `maybeOpenRxWindow` and improve docs
