@@ -83,7 +83,7 @@ delete k c@LRUCache{..} = c{lcQueue = q}
 lookup :: Ord k => k -> LRUCache k v -> Maybe v
 lookup k LRUCache{..} = snd <$> PSQ.lookup k lcQueue
 
--- | Looking up. /O(log n)/
+-- | Looking up and changing priority. /O(log n)/
 lookup' :: Ord k => k -> LRUCache k v -> Maybe (v, LRUCache k v)
 lookup' k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
     (Nothing, _) -> Nothing

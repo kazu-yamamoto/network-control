@@ -1,5 +1,10 @@
 # Revision history for network-control
 
+## 0.1.5
+
+* New API: `lookup'` adjusts the target priority.
+* New API: `LRUCacheRef`
+
 ## 0.1.4
 
 * Using Integer instead of Int in LRUCache.
