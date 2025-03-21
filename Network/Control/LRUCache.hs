@@ -7,11 +7,13 @@ module Network.Control.LRUCache (
     insert,
     delete,
     lookup,
+    lookup',
 
     -- * IO
     LRUCacheRef,
     newLRUCacheRef,
     cached,
+    cached',
 ) where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
@@ -78,8 +80,12 @@ delete k c@LRUCache{..} = c{lcQueue = q}
 ----------------------------------------------------------------
 
 -- | Looking up. /O(log n)/
-lookup :: Ord k => k -> LRUCache k v -> Maybe (v, LRUCache k v)
-lookup k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
+lookup :: Ord k => k -> LRUCache k v -> Maybe v
+lookup k LRUCache{..} = snd <$> PSQ.lookup k lcQueue
+
+-- | Looking up. /O(log n)/
+lookup' :: Ord k => k -> LRUCache k v -> Maybe (v, LRUCache k v)
+lookup' k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
     (Nothing, _) -> Nothing
     (Just v, q) ->
         let c' = trim $ c{lcTick = lcTick + 1, lcQueue = q}
@@ -96,14 +102,20 @@ newtype LRUCacheRef k v = LRUCacheRef (IORef (LRUCache k v))
 newLRUCacheRef :: Int -> IO (LRUCacheRef k v)
 newLRUCacheRef capacity = LRUCacheRef <$> newIORef (empty capacity)
 
-cached :: Ord k => LRUCacheRef k v -> k -> IO v -> IO v
+cached' :: Ord k => LRUCacheRef k v -> k -> IO (Maybe v)
+cached' (LRUCacheRef ref) k = do
+    atomicModifyIORef' ref $ \c -> case lookup' k c of
+        Nothing -> (c, Nothing)
+        Just (v, c') -> (c', Just v)
+
+cached :: Ord k => LRUCacheRef k v -> k -> IO v -> IO (v, Bool)
 cached (LRUCacheRef ref) k io = do
-    lookupRes <- atomicModifyIORef' ref $ \c -> case lookup k c of
+    lookupRes <- atomicModifyIORef' ref $ \c -> case lookup' k c of
         Nothing -> (c, Nothing)
         Just (v, c') -> (c', Just v)
     case lookupRes of
-        Just v -> return v
+        Just v -> return (v, True)
         Nothing -> do
             v <- io
             atomicModifyIORef' ref $ \c -> (insert k v c, ())
-            return v
+            return (v, False)
