@@ -16,6 +16,8 @@ import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
 import Prelude hiding (lookup)
 
+----------------------------------------------------------------
+
 type Priority = Int64
 
 -- | Sized cache based on least recently used.
@@ -29,6 +31,8 @@ data LRUCache k v = LRUCache
     , lcQueue :: OrdPSQ k Priority v
     }
     deriving (Eq, Show)
+
+----------------------------------------------------------------
 
 -- | Empty 'LRUCache'.
 empty
@@ -45,6 +49,8 @@ empty capacity
             , lcQueue = PSQ.empty
             }
 
+----------------------------------------------------------------
+
 trim :: Ord k => LRUCache k v -> LRUCache k v
 trim c@LRUCache{..}
     | lcTick == maxBound = empty lcLimit
@@ -55,22 +61,30 @@ trim c@LRUCache{..}
             }
     | otherwise = c
 
+----------------------------------------------------------------
+
 -- | Inserting.
 insert :: Ord k => k -> v -> LRUCache k v -> LRUCache k v
-insert key val c@LRUCache{..} =
-    trim $
-        let (mbOldVal, queue) = PSQ.insertView key lcTick val lcQueue
-         in c
-                { lcSize = if isNothing mbOldVal then lcSize + 1 else lcSize
-                , lcTick = lcTick + 1
-                , lcQueue = queue
-                }
+insert key val c@LRUCache{..} = trim c'
+  where
+    (mbOldVal, queue) = PSQ.insertView key lcTick val lcQueue
+    size = if isNothing mbOldVal then lcSize + 1 else lcSize
+    c' =
+        c
+            { lcSize = size
+            , lcTick = lcTick + 1
+            , lcQueue = queue
+            }
+
+----------------------------------------------------------------
 
 -- | Deleting.
 delete :: Ord k => k -> LRUCache k v -> LRUCache k v
-delete k c@LRUCache{..} =
-    let q = PSQ.delete k lcQueue
-     in c{lcQueue = q, lcSize = lcSize - 1}
+delete k c@LRUCache{..} = c{lcQueue = q, lcSize = lcSize - 1}
+  where
+    q = PSQ.delete k lcQueue
+
+----------------------------------------------------------------
 
 -- | Looking up.
 lookup :: Ord k => k -> LRUCache k v -> Maybe (v, LRUCache k v)
@@ -82,6 +96,8 @@ lookup k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
   where
     lookupAndBump Nothing = (Nothing, Nothing)
     lookupAndBump (Just (_, x)) = (Just x, Just (lcTick, x))
+
+----------------------------------------------------------------
 
 newtype Handle k v = Handle (IORef (LRUCache k v))
 
