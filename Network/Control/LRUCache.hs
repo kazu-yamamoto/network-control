@@ -11,7 +11,6 @@ module Network.Control.LRUCache (
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import Data.Int (Int64)
-import Data.Maybe (isNothing)
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
 import Prelude hiding (lookup)
@@ -24,8 +23,6 @@ type Priority = Int64
 data LRUCache k v = LRUCache
     { lcLimit :: Int
     -- ^ The maximum number of elements in the queue
-    , lcSize :: Int
-    -- ^ The current number of elements in the queue
     , lcTick :: Priority
     -- ^ The next logical time
     , lcQueue :: OrdPSQ k Priority v
@@ -44,7 +41,6 @@ empty capacity
     | otherwise =
         LRUCache
             { lcLimit = capacity
-            , lcSize = 0
             , lcTick = 0
             , lcQueue = PSQ.empty
             }
@@ -54,11 +50,7 @@ empty capacity
 trim :: Ord k => LRUCache k v -> LRUCache k v
 trim c@LRUCache{..}
     | lcTick == maxBound = empty lcLimit
-    | lcSize > lcLimit =
-        c
-            { lcSize = lcSize - 1
-            , lcQueue = PSQ.deleteMin lcQueue
-            }
+    | PSQ.size lcQueue > lcLimit = c{lcQueue = PSQ.deleteMin lcQueue}
     | otherwise = c
 
 ----------------------------------------------------------------
@@ -67,12 +59,10 @@ trim c@LRUCache{..}
 insert :: Ord k => k -> v -> LRUCache k v -> LRUCache k v
 insert key val c@LRUCache{..} = trim c'
   where
-    (mbOldVal, queue) = PSQ.insertView key lcTick val lcQueue
-    size = if isNothing mbOldVal then lcSize + 1 else lcSize
+    queue = PSQ.insert key lcTick val lcQueue
     c' =
         c
-            { lcSize = size
-            , lcTick = lcTick + 1
+            { lcTick = lcTick + 1
             , lcQueue = queue
             }
 
@@ -80,7 +70,7 @@ insert key val c@LRUCache{..} = trim c'
 
 -- | Deleting.
 delete :: Ord k => k -> LRUCache k v -> LRUCache k v
-delete k c@LRUCache{..} = c{lcQueue = q, lcSize = lcSize - 1}
+delete k c@LRUCache{..} = c{lcQueue = q}
   where
     q = PSQ.delete k lcQueue
 
