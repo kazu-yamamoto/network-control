@@ -7,6 +7,11 @@ module Network.Control.LRUCache (
     insert,
     delete,
     lookup,
+
+    -- * IO
+    LRUCacheRef,
+    newLRUCacheRef,
+    cached,
 ) where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
@@ -86,13 +91,13 @@ lookup k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
 
 ----------------------------------------------------------------
 
-newtype Handle k v = Handle (IORef (LRUCache k v))
+newtype LRUCacheRef k v = LRUCacheRef (IORef (LRUCache k v))
 
-newHandle :: Int -> IO (Handle k v)
-newHandle capacity = Handle <$> newIORef (empty capacity)
+newLRUCacheRef :: Int -> IO (LRUCacheRef k v)
+newLRUCacheRef capacity = LRUCacheRef <$> newIORef (empty capacity)
 
-cached :: Ord k => Handle k v -> k -> IO v -> IO v
-cached (Handle ref) k io = do
+cached :: Ord k => LRUCacheRef k v -> k -> IO v -> IO v
+cached (LRUCacheRef ref) k io = do
     lookupRes <- atomicModifyIORef' ref $ \c -> case lookup k c of
         Nothing -> (c, Nothing)
         Just (v, c') -> (c', Just v)
