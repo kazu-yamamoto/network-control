@@ -31,7 +31,7 @@ data LRUCache k v = LRUCache
 
 ----------------------------------------------------------------
 
--- | Empty 'LRUCache'.
+-- | Empty 'LRUCache'. /O(1)/
 empty
     :: Int
     -- ^ The size of 'LRUCache'.
@@ -55,20 +55,16 @@ trim c@LRUCache{..}
 
 ----------------------------------------------------------------
 
--- | Inserting.
+-- | Inserting. /O(log n)/
 insert :: Ord k => k -> v -> LRUCache k v -> LRUCache k v
 insert key val c@LRUCache{..} = trim c'
   where
     queue = PSQ.insert key lcTick val lcQueue
-    c' =
-        c
-            { lcTick = lcTick + 1
-            , lcQueue = queue
-            }
+    c' = c{lcTick = lcTick + 1, lcQueue = queue}
 
 ----------------------------------------------------------------
 
--- | Deleting.
+-- | Deleting. /O(log n)/
 delete :: Ord k => k -> LRUCache k v -> LRUCache k v
 delete k c@LRUCache{..} = c{lcQueue = q}
   where
@@ -76,16 +72,17 @@ delete k c@LRUCache{..} = c{lcQueue = q}
 
 ----------------------------------------------------------------
 
--- | Looking up.
+-- | Looking up. /O(log n)/
 lookup :: Ord k => k -> LRUCache k v -> Maybe (v, LRUCache k v)
 lookup k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
     (Nothing, _) -> Nothing
-    (Just x, q) ->
+    (Just v, q) ->
         let c' = trim $ c{lcTick = lcTick + 1, lcQueue = q}
-         in Just (x, c')
+         in Just (v, c')
   where
     lookupAndBump Nothing = (Nothing, Nothing)
-    lookupAndBump (Just (_, x)) = (Just x, Just (lcTick, x))
+    -- setting its priority to lcTick
+    lookupAndBump (Just (_p, v)) = (Just v, Just (lcTick, v))
 
 ----------------------------------------------------------------
 
