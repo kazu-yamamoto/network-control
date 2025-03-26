@@ -56,7 +56,15 @@ empty capacity
 
 trim :: Ord k => LRUCache k v -> LRUCache k v
 trim c@LRUCache{..}
-    | lcTick == maxBound = empty lcLimit
+    | lcTick == maxBound =
+        let siz = fromIntegral $ PSQ.size lcQueue
+            diff = (maxBound :: Priority) - siz
+            psq = PSQ.unsafeMapMonotonic (\_ p v -> (p - diff, v)) lcQueue
+         in LRUCache
+                { lcLimit = lcLimit
+                , lcTick = siz
+                , lcQueue = psq
+                }
     | PSQ.size lcQueue > lcLimit = c{lcQueue = PSQ.deleteMin lcQueue}
     | otherwise = c
 
