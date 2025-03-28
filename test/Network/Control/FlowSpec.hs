@@ -1,8 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-orphans -Wno-incomplete-patterns #-}
 
 module Network.Control.FlowSpec (spec) where
@@ -104,7 +101,7 @@ assertTrace (Trace initialFlow steps) = assertStep initialFlow steps
 assertStep :: RxFlow -> [(Int, Step OpWithResult, RxFlow)] -> Property
 assertStep _ [] = property True
 assertStep oldFlow ((ix, step, newFlow) : steps) =
-    (counterexample ("step #" <> show ix) check) .&. assertStep newFlow steps
+    counterexample ("step #" <> show ix) check .&. assertStep newFlow steps
   where
     check :: Expectation
     check = case step of
@@ -141,10 +138,9 @@ assertStep oldFlow ((ix, step, newFlow) : steps) =
             newFlow `shouldSatisfy` \flow ->
                 rxfLimit flow > rxfConsumed flow
             -- Condition (c)
-            limitDelta `shouldSatisfy` \mUpd ->
-                case mUpd of
-                    Nothing -> True
-                    Just upd -> upd >= rxfBufSize newFlow `div` 8
+            limitDelta `shouldSatisfy` \case
+                Nothing -> True
+                Just upd -> upd >= rxfBufSize newFlow `div` 8
         Step (ReceiveWithResult isAcceptable) arg -> do
             newFlow
                 `shouldBe` if isAcceptable

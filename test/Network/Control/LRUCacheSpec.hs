@@ -13,6 +13,6 @@ spec = do
                 (v, cache') = fromJust $ LRU.lookup' 'a' cache
             v `shouldBe` "foo"
             let cache'' = insert 'c' "baz" cache'
-            fst <$> (LRU.lookup' 'a' cache'') `shouldBe` Just "foo"
-            fst <$> (LRU.lookup' 'b' cache'') `shouldBe` Nothing
-            fst <$> (LRU.lookup' 'c' cache'') `shouldBe` Just "baz"
+            fst <$> LRU.lookup' 'a' cache'' `shouldBe` Just "foo"
+            fst <$> LRU.lookup' 'b' cache'' `shouldBe` Nothing
+            fst <$> LRU.lookup' 'c' cache'' `shouldBe` Just "baz"
