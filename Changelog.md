@@ -3,7 +3,8 @@
 ## 0.1.5
 
 * New API: `lookup'` adjusts the target priority.
-* New API: `LRUCacheRef`
+* New API: `LRUCacheRef` stuffs
+* `insert` rebuilds PSQ when reached the limit.
 
 ## 0.1.4
 
