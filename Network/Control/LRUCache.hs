@@ -14,6 +14,9 @@ module Network.Control.LRUCache (
     newLRUCacheRef,
     cached,
     cached',
+
+    -- * Internal
+    empty',
 ) where
 
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
@@ -51,6 +54,20 @@ empty capacity
             , lcTick = 0
             , lcQueue = PSQ.empty
             }
+
+-- | Empty 'LRUCache'. /O(1)/
+empty'
+    :: Int
+    -- ^ The size of 'LRUCache'.
+    -> Int64
+    -- ^ Counter
+    -> LRUCache k v
+empty' capacity tick =
+    LRUCache
+        { lcLimit = capacity
+        , lcTick = tick
+        , lcQueue = PSQ.empty
+        }
 
 ----------------------------------------------------------------
 
