@@ -5,7 +5,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-orphans -Wno-incomplete-patterns #-}
 
-module Network.Control.FlowSpec where
+module Network.Control.FlowSpec (spec) where
 
 import Data.List
 import Data.Text.Lazy (unpack)
@@ -159,5 +159,6 @@ assertStep oldFlow ((ix, step, newFlow) : steps) =
 
 spec :: Spec
 spec = do
-    focus . prop "state transition graph checks out" $
-        \trace -> counterexample (unpack $ pShowNoColor trace) (assertTrace trace)
+    describe "Flow" $ do
+        prop "state transition graph checks out" $ \trace ->
+            counterexample (unpack $ pShowNoColor trace) (assertTrace trace)
