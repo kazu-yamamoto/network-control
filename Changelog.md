@@ -1,5 +1,9 @@
 # Revision history for network-control
 
+## 0.1.6
+
+* Allowing size 0.
+
 ## 0.1.5
 
 * New API: `lookup'` adjusts the target priority.
