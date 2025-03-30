@@ -46,14 +46,12 @@ empty
     :: Int
     -- ^ The size of 'LRUCache'.
     -> LRUCache k v
-empty capacity
-    | capacity < 1 = error "LRUCache.empty: capacity < 1"
-    | otherwise =
-        LRUCache
-            { lcLimit = capacity
-            , lcTick = 0
-            , lcQueue = PSQ.empty
-            }
+empty capacity =
+    LRUCache
+        { lcLimit = capacity
+        , lcTick = 0
+        , lcQueue = PSQ.empty
+        }
 
 -- | Empty 'LRUCache'. /O(1)/
 empty'
