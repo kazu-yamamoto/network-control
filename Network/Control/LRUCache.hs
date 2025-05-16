@@ -120,17 +120,16 @@ lookup' k c@LRUCache{..} = case PSQ.alter lookupAndBump k lcQueue of
 
 ----------------------------------------------------------------
 
+-- | Mutable LRUCache.
 newtype LRUCacheRef k v = LRUCacheRef (IORef (LRUCache k v))
 
+-- | Creating 'LRUCacheRef'.
 newLRUCacheRef :: Int -> IO (LRUCacheRef k v)
 newLRUCacheRef capacity = LRUCacheRef <$> newIORef (empty capacity)
 
-cached' :: Ord k => LRUCacheRef k v -> k -> IO (Maybe v)
-cached' (LRUCacheRef ref) k = do
-    atomicModifyIORef' ref $ \c -> case lookup' k c of
-        Nothing -> (c, Nothing)
-        Just (v, c') -> (c', Just v)
-
+-- | Looking up a target and adjusting the LRU cache.
+--   If not found, a new value is inserted.
+--   A pair of value and "found" is returned.
 cached :: Ord k => LRUCacheRef k v -> k -> IO v -> IO (v, Bool)
 cached (LRUCacheRef ref) k io = do
     lookupRes <- atomicModifyIORef' ref $ \c -> case lookup' k c of
@@ -142,3 +141,10 @@ cached (LRUCacheRef ref) k io = do
             v <- io
             atomicModifyIORef' ref $ \c -> (insert k v c, ())
             return (v, False)
+
+-- | Looking up a target and adjusting the LRU cache.
+cached' :: Ord k => LRUCacheRef k v -> k -> IO (Maybe v)
+cached' (LRUCacheRef ref) k = do
+    atomicModifyIORef' ref $ \c -> case lookup' k c of
+        Nothing -> (c, Nothing)
+        Just (v, c') -> (c', Just v)
