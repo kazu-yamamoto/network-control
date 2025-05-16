@@ -14,6 +14,7 @@ module Network.Control.LRUCache (
     newLRUCacheRef,
     cached,
     cached',
+    setLRUCapacity,
 
     -- * Internal
     empty',
@@ -148,3 +149,8 @@ cached' (LRUCacheRef ref) k = do
     atomicModifyIORef' ref $ \c -> case lookup' k c of
         Nothing -> (c, Nothing)
         Just (v, c') -> (c', Just v)
+
+-- | Setting capacity of the LRU cache.
+setLRUCapacity :: LRUCacheRef k v -> Int -> IO ()
+setLRUCapacity (LRUCacheRef ref) lim = atomicModifyIORef' ref $ \c ->
+    (c{lcLimit = lim}, ())
