@@ -1,5 +1,9 @@
 # Revision history for network-control
 
+## 0.1.7
+
+* Implementing setLRUCapacity.
+
 ## 0.1.6
 
 * Allowing size 0.
