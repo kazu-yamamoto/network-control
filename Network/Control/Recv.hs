@@ -4,6 +4,7 @@ module Network.Control.Recv (
     -- * Controlled receiving
     Check,
     Control,
+    controlContinue,
     newControl,
     Terminate (..),
     withControlledRecv,
