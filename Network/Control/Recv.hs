@@ -1,30 +1,57 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Network.Control.Recv where
+module Network.Control.Recv (
+    -- * Controlled receiving
+    Check,
+    Control,
+    newControl,
+    Terminate (..),
+    withControlledRecv,
+    getLeftover,
+
+    -- * Internal
+    controlledRecv,
+    Result (..),
+) where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.IORef
 
--- | Return 'True' when continuation is possible
+-- | Return 'True' when receiving data is possible.
+type Check = IO Bool
+
+-- | Control data for a receiving function.
 data Control = Control
-    { controlContinue :: IO Bool
+    { controlContinue :: Check
     , controlBuilder :: IORef (Int, [ByteString] -> [ByteString])
     }
 
-newControl :: IO Bool -> IO Control
+-- | Creating 'Control'.
+newControl
+    :: Check
+    -> IO Control
 newControl controlContinue = do
     controlBuilder <- newIORef (0, id)
     return Control{..}
 
-data Terminate = EOF | Break deriving (Eq, Show)
+-- | The reason why the receiving function is terminated.
+data Terminate
+    = -- | End of file.
+      EOF
+    | -- | When 'Check' returns 'False', 'Break' is retuned. 'Break'
+      --   is timeout in the normal case.
+      Break
+    deriving (Eq, Show)
 
+-- | Result.
 data Result
     = Terminate Terminate
     | NotEnough
     | NBytes ByteString
     deriving (Eq, Show)
 
+-- | Controlled receiving function.
 controlledRecv :: Control -> (Int -> IO ByteString) -> Int -> IO Result
 controlledRecv Control{..} recvN len = do
     cont <- controlContinue
@@ -49,18 +76,22 @@ controlledRecv Control{..} recvN len = do
                             return NotEnough
         else return $ Terminate Break
 
--- Use to get leftover for Terminate
+-- | Use to get leftover for 'Terminate'.
 getLeftover :: Control -> IO ByteString
 getLeftover Control{..} = do
     (_blen, builder) <- readIORef controlBuilder
     let leftover = BS.concat $ builder []
     return leftover
 
+-- | Calling an action with 'ByteString' of the exact size.
 withControlledRecv
     :: Control
     -> (Int -> IO ByteString)
+    -- ^ Receiving function
     -> Int
+    -- ^ How many bytes are wanted.
     -> (ByteString -> IO a)
+    -- ^ An action which receives 'ByteString' of the exact size.
     -> IO (Either Terminate a)
 withControlledRecv ctl recvN len action = go
   where
