@@ -1,5 +1,10 @@
 # Revision history for network-control
 
+## 0.2.0
+
+* Use Int64 for the amounts of TxFlow and RxFlow
+  [#9](https://github.com/kazu-yamamoto/network-control/pull/9)
+
 ## 0.1.7
 
 * Implementing setLRUCapacity.
