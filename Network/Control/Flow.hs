@@ -28,6 +28,7 @@ module Network.Control.Flow (
 ) where
 
 import Data.Bits
+import Data.Int (Int64)
 
 -- | Default max streams. (64)
 defaultMaxStreams :: Int
@@ -50,7 +51,9 @@ defaultMaxStreamData = 262144
 defaultMaxData :: Int
 defaultMaxData = defaultMaxStreamData * defaultMaxStreams
 
--- | Window size.
+-- | Window size.  The amounts in 'TxFlow' and 'RxFlow' are 'Int64'
+--   instead: they are totals over a connection's life, which in QUIC go up
+--   to 2^62 whatever the size of 'Int'.
 type WindowSize = Int
 
 -- | Flow for sending
@@ -64,19 +67,19 @@ type WindowSize = Int
 --        txWindowSize
 -- @
 data TxFlow = TxFlow
-    { txfSent :: Int
+    { txfSent :: Int64
     -- ^ The total size of sent data.
-    , txfLimit :: Int
+    , txfLimit :: Int64
     -- ^ The total size of data which can be sent.
     }
     deriving (Eq, Show)
 
 -- | Creating TX flow with a receive buffer size.
-newTxFlow :: WindowSize -> TxFlow
+newTxFlow :: Int64 -> TxFlow
 newTxFlow win = TxFlow 0 win
 
 -- | 'txfLimit' - 'txfSent'.
-txWindowSize :: TxFlow -> WindowSize
+txWindowSize :: TxFlow -> Int64
 txWindowSize TxFlow{..} = txfLimit - txfSent
 
 -- | Flow for receiving.
@@ -113,20 +116,20 @@ txWindowSize TxFlow{..} = txfLimit - txfSent
 -- ('maybeOpenRxWindow'). To decrease overhead, we only this if the window
 -- update is at least half the window size.
 data RxFlow = RxFlow
-    { rxfBufSize :: Int
+    { rxfBufSize :: Int64
     -- ^ Maxinum number of unconsumed bytes the peer can send us
     --
     -- See discussion above for details.
-    , rxfConsumed :: Int
+    , rxfConsumed :: Int64
     -- ^ How much of the data that the peer has sent us have we consumed?
     --
     -- This is an absolute number: the total about of bytes consumed over the
     -- lifetime of the connection or stream (i.e., not relative to the window).
-    , rxfReceived :: Int
+    , rxfReceived :: Int64
     -- ^ How much data have we received from the peer?
     --
     -- Like 'rxfConsumed', this is an absolute number.
-    , rxfLimit :: Int
+    , rxfLimit :: Int64
     -- ^ Current limit on how many bytes the peer is allowed to send us.
     --
     -- Like 'rxfConsumed, this is an absolute number.
@@ -134,14 +137,14 @@ data RxFlow = RxFlow
     deriving (Eq, Show)
 
 -- | Creating RX flow with an initial window size.
-newRxFlow :: WindowSize -> RxFlow
+newRxFlow :: Int64 -> RxFlow
 newRxFlow win = RxFlow win 0 0 win
 
 -- | 'rxfLimit' - 'rxfReceived'.
 --
 -- This is the number of bytes the peer is still allowed to send before they
 -- must wait for a window update; see 'RxFlow' for details.
-rxWindowSize :: RxFlow -> WindowSize
+rxWindowSize :: RxFlow -> Int64
 rxWindowSize RxFlow{..} = rxfLimit - rxfReceived
 
 -- | The representation of window size update.
@@ -155,11 +158,11 @@ data FlowControlType
 --
 -- May return a window update; see 'RxFlow' for details.
 maybeOpenRxWindow
-    :: Int
+    :: Int64
     -- ^ The consumed size.
     -> FlowControlType
     -> RxFlow
-    -> (RxFlow, Maybe Int)
+    -> (RxFlow, Maybe Int64)
     -- ^ 'Just' if the size should be informed to the peer.
 maybeOpenRxWindow consumed fct flow@RxFlow{..}
     | winUpdate >= threshold =
@@ -188,7 +191,7 @@ maybeOpenRxWindow consumed fct flow@RxFlow{..}
 -- | Checking if received data is acceptable against the
 --   current window.
 checkRxLimit
-    :: Int
+    :: Int64
     -- ^ The size of received data.
     -> RxFlow
     -> (RxFlow, Bool)

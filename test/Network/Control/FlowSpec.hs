@@ -4,6 +4,7 @@
 
 module Network.Control.FlowSpec (spec) where
 
+import Data.Int (Int64)
 import Data.List
 import Data.Text.Lazy (unpack)
 import Network.Control
@@ -17,10 +18,10 @@ import Text.Pretty.Simple
 data Op = Consume | Receive
     deriving (Eq, Show, Bounded, Enum)
 
-data OpWithResult = ConsumeWithResult (Maybe Int) | ReceiveWithResult Bool
+data OpWithResult = ConsumeWithResult (Maybe Int64) | ReceiveWithResult Bool
     deriving (Eq, Show)
 
-data Step op = Step {stepOp :: op, stepArg :: Int}
+data Step op = Step {stepOp :: op, stepArg :: Int64}
     deriving (Eq, Show)
 
 data Trace = Trace
@@ -31,7 +32,7 @@ data Trace = Trace
 
 -- arbitrary instances
 
-maxWindowSize :: Int
+maxWindowSize :: Int64
 maxWindowSize = 200 -- (more realistic: 2_000_000)
 
 instance Arbitrary RxFlow where
@@ -40,7 +41,7 @@ instance Arbitrary RxFlow where
         newRxFlow
             <$> oneof
                 [ elements [1, 10, 50, 100]
-                , chooseInt (1, maxWindowSize)
+                , choose (1, maxWindowSize)
                 ]
 
 instance Arbitrary Op where
@@ -65,12 +66,12 @@ instance Arbitrary Trace where
             -- size are theoretically possible (but will trivially be rejected
             -- as exceeding the window).
             mkReceive =
-                Step Receive <$> chooseInt (0, rxfBufSize oldFlow * 2)
+                Step Receive <$> choose (0, rxfBufSize oldFlow * 2)
 
             -- We can only consume as much as we have received
             -- (but it is in principle not a problem to consume 0 bytes)
             mkConsume =
-                Step Consume <$> chooseInt (0, rxfReceived oldFlow - rxfConsumed oldFlow)
+                Step Consume <$> choose (0, rxfReceived oldFlow - rxfConsumed oldFlow)
 
         runStep :: RxFlow -> Step Op -> (Step OpWithResult, RxFlow)
         runStep oldFlow = \case
@@ -158,3 +159,10 @@ spec = do
     describe "Flow" $ do
         prop "state transition graph checks out" $ \trace ->
             counterexample (unpack $ pShowNoColor trace) (assertTrace trace)
+        -- QUIC's totals go up to 2^62, past a 32-bit Int.
+        it "keeps totals past 32 bits" $ do
+            let big = 2 ^ (40 :: Int) :: Int64
+                (flow, ok) = checkRxLimit big $ newRxFlow (big + 1)
+            ok `shouldBe` True
+            rxWindowSize flow `shouldBe` 1
+            txWindowSize (TxFlow big (big * 2)) `shouldBe` big
